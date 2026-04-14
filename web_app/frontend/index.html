@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LBW DRS - Decision Review System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .video-container { position: relative; }
+        .marker { position: absolute; width: 12px; height: 12px; border-radius: 50%; transform: translate(-50%, -50%); cursor: pointer; }
+        .marker-ball { background: #fbbf24; border: 2px solid #fff; }
+        .marker-pitch { background: #22c55e; border: 2px solid #fff; }
+        .marker-impact { background: #ef4444; border: 2px solid #fff; }
+        .wicket-box { position: absolute; border: 2px dashed #06b6d4; background: rgba(6, 182, 212, 0.1); }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <!-- Header -->
+    <header class="bg-gray-800 border-b border-gray-700 py-4">
+        <div class="container mx-auto px-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center font-bold">DRS</div>
+                <div>
+                    <h1 class="text-xl font-bold">LBW Decision Review System</h1>
+                    <p class="text-gray-400 text-sm">Cricket Ball Tracking & Analysis</p>
+                </div>
+            </div>
+            <a href="https://github.com/suthersrikanth/LBW-DRS" target="_blank" class="text-gray-400 hover:text-white">
+                GitHub
+            </a>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-8">
+        <!-- Upload Section -->
+        <div id="upload-section" class="max-w-2xl mx-auto">
+            <div class="bg-gray-800 rounded-xl p-8 border-2 border-dashed border-gray-600 hover:border-blue-500 transition cursor-pointer" 
+                 onclick="document.getElementById('video-input').click()">
+                <div class="text-center">
+                    <svg class="w-16 h-16 mx-auto text-gray-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    </svg>
+                    <h3 class="text-xl font-semibold mb-2">Upload Cricket Video</h3>
+                    <p class="text-gray-400">Drag & drop or click to select</p>
+                    <p class="text-gray-500 text-sm mt-2">Supports: MP4, AVI, MOV, WebM</p>
+                </div>
+            </div>
+            <input type="file" id="video-input" accept="video/*" class="hidden" onchange="handleVideoUpload(event)">
+        </div>
+
+        <!-- Editor Section (hidden initially) -->
+        <div id="editor-section" class="hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Video Player -->
+                <div class="lg:col-span-2">
+                    <div class="bg-gray-800 rounded-xl p-4">
+                        <div class="video-container relative bg-black rounded-lg overflow-hidden" id="video-container">
+                            <video id="video-player" class="w-full"></video>
+                            <canvas id="overlay-canvas" class="absolute top-0 left-0 w-full h-full pointer-events-none"></canvas>
+                            <div id="markers-container" class="absolute top-0 left-0 w-full h-full"></div>
+                        </div>
+                        
+                        <!-- Frame Controls -->
+                        <div class="mt-4 space-y-3">
+                            <div class="flex items-center gap-4">
+                                <button onclick="prevFrame()" class="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">◀ Prev</button>
+                                <button onclick="togglePlay()" id="play-btn" class="px-6 py-2 bg-blue-600 rounded hover:bg-blue-500">▶ Play</button>
+                                <button onclick="nextFrame()" class="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">Next ▶</button>
+                                <span class="text-gray-400">Frame: <span id="frame-num">0</span> / <span id="total-frames">0</span></span>
+                            </div>
+                            <input type="range" id="frame-slider" class="w-full" min="0" value="0" oninput="seekToFrame(this.value)">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Controls Panel -->
+                <div class="space-y-4">
+                    <!-- Mode Selection -->
+                    <div class="bg-gray-800 rounded-xl p-4">
+                        <h3 class="font-semibold mb-3">Marking Mode</h3>
+                        <div class="space-y-2">
+                            <button onclick="setMode('ball')" id="mode-ball" class="w-full py-2 px-4 rounded bg-yellow-600 text-left">
+                                🟡 Ball Position
+                            </button>
+                            <button onclick="setMode('pitch')" id="mode-pitch" class="w-full py-2 px-4 rounded bg-gray-700 text-left hover:bg-gray-600">
+                                🟢 Pitching Point
+                            </button>
+                            <button onclick="setMode('impact')" id="mode-impact" class="w-full py-2 px-4 rounded bg-gray-700 text-left hover:bg-gray-600">
+                                🔴 Impact Point
+                            </button>
+                            <button onclick="setMode('wicket')" id="mode-wicket" class="w-full py-2 px-4 rounded bg-gray-700 text-left hover:bg-gray-600">
+                                📍 Mark Wickets
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Marked Points -->
+                    <div class="bg-gray-800 rounded-xl p-4">
+                        <h3 class="font-semibold mb-3">Marked Points</h3>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">Ball positions:</span>
+                                <span id="ball-count">0</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">Pitching:</span>
+                                <span id="pitch-status" class="text-red-400">Not set</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">Impact:</span>
+                                <span id="impact-status" class="text-red-400">Not set</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">Wickets:</span>
+                                <span id="wicket-status" class="text-red-400">Not set</span>
+                            </div>
+                        </div>
+                        <button onclick="clearAll()" class="w-full mt-4 py-2 bg-red-600/20 text-red-400 rounded hover:bg-red-600/30">
+                            Clear All
+                        </button>
+                    </div>
+
+                    <!-- Analyze Button -->
+                    <button onclick="analyzeDRS()" id="analyze-btn" disabled
+                            class="w-full py-3 bg-green-600 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-green-500">
+                        🎯 Analyze LBW Decision
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section (hidden initially) -->
+        <div id="results-section" class="hidden max-w-4xl mx-auto">
+            <div class="bg-gray-800 rounded-xl p-6">
+                <div class="text-center mb-6">
+                    <h2 class="text-3xl font-bold mb-2" id="decision-text">OUT</h2>
+                    <p class="text-gray-400" id="reason-text">Ball hitting stumps</p>
+                </div>
+                
+                <div class="grid grid-cols-3 gap-4 mb-6">
+                    <div class="bg-gray-700 rounded-lg p-4 text-center">
+                        <div class="text-gray-400 text-sm">Pitching</div>
+                        <div class="font-semibold text-green-400" id="result-pitching">IN LINE</div>
+                    </div>
+                    <div class="bg-gray-700 rounded-lg p-4 text-center">
+                        <div class="text-gray-400 text-sm">Impact</div>
+                        <div class="font-semibold text-green-400" id="result-impact">IN LINE</div>
+                    </div>
+                    <div class="bg-gray-700 rounded-lg p-4 text-center">
+                        <div class="text-gray-400 text-sm">Wickets</div>
+                        <div class="font-semibold text-red-400" id="result-wickets">HITTING</div>
+                    </div>
+                </div>
+
+                <div class="flex justify-center gap-4">
+                    <a id="download-video" href="#" class="px-6 py-2 bg-blue-600 rounded hover:bg-blue-500">
+                        Download Video
+                    </a>
+                    <a id="download-image" href="#" class="px-6 py-2 bg-gray-700 rounded hover:bg-gray-600">
+                        Download Image
+                    </a>
+                    <button onclick="startOver()" class="px-6 py-2 bg-gray-700 rounded hover:bg-gray-600">
+                        Analyze Another
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Loading Overlay -->
+    <div id="loading" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+        <div class="text-center">
+            <div class="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p class="text-xl" id="loading-text">Processing...</p>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+        
+        let videoId = null;
+        let videoInfo = null;
+        let currentFrame = 0;
+        let currentMode = 'ball';
+        let trajectory = [];
+        let pitchingPoint = null;
+        let impactPoint = null;
+        let wicketRect = null;
+        let wicketStart = null;
+
+        const video = document.getElementById('video-player');
+        const canvas = document.getElementById('overlay-canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Handle video upload
+        async function handleVideoUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            showLoading('Uploading video...');
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch(`${API_URL}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                videoId = data.video_id;
+
+                // Get video info
+                const infoResponse = await fetch(`${API_URL}/video/${videoId}/info`);
+                videoInfo = await infoResponse.json();
+
+                // Setup video player
+                video.src = URL.createObjectURL(file);
+                await video.load();
+                
+                document.getElementById('total-frames').textContent = videoInfo.total_frames;
+                document.getElementById('frame-slider').max = videoInfo.total_frames - 1;
+
+                // Show editor
+                document.getElementById('upload-section').classList.add('hidden');
+                document.getElementById('editor-section').classList.remove('hidden');
+
+                // Setup canvas
+                video.addEventListener('loadedmetadata', () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                });
+
+                hideLoading();
+            } catch (error) {
+                alert('Upload failed: ' + error.message);
+                hideLoading();
+            }
+        }
+
+        // Frame navigation
+        function nextFrame() {
+            if (currentFrame < videoInfo.total_frames - 1) {
+                currentFrame++;
+                seekToFrame(currentFrame);
+            }
+        }
+
+        function prevFrame() {
+            if (currentFrame > 0) {
+                currentFrame--;
+                seekToFrame(currentFrame);
+            }
+        }
+
+        function seekToFrame(frame) {
+            currentFrame = parseInt(frame);
+            video.currentTime = currentFrame / videoInfo.fps;
+            document.getElementById('frame-num').textContent = currentFrame;
+            document.getElementById('frame-slider').value = currentFrame;
+            drawOverlay();
+        }
+
+        function togglePlay() {
+            if (video.paused) {
+                video.play();
+                document.getElementById('play-btn').textContent = '⏸ Pause';
+            } else {
+                video.pause();
+                document.getElementById('play-btn').textContent = '▶ Play';
+            }
+        }
+
+        video.addEventListener('timeupdate', () => {
+            currentFrame = Math.floor(video.currentTime * videoInfo.fps);
+            document.getElementById('frame-num').textContent = currentFrame;
+            document.getElementById('frame-slider').value = currentFrame;
+        });
+
+        // Mode selection
+        function setMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('[id^="mode-"]').forEach(btn => {
+                btn.classList.remove('bg-yellow-600', 'bg-green-600', 'bg-red-600', 'bg-cyan-600');
+                btn.classList.add('bg-gray-700');
+            });
+            const colors = { ball: 'bg-yellow-600', pitch: 'bg-green-600', impact: 'bg-red-600', wicket: 'bg-cyan-600' };
+            document.getElementById(`mode-${mode}`).classList.remove('bg-gray-700');
+            document.getElementById(`mode-${mode}`).classList.add(colors[mode]);
+        }
+
+        // Click handling
+        document.getElementById('video-container').addEventListener('click', (e) => {
+            const rect = video.getBoundingClientRect();
+            const scaleX = video.videoWidth / rect.width;
+            const scaleY = video.videoHeight / rect.height;
+            const x = Math.round((e.clientX - rect.left) * scaleX);
+            const y = Math.round((e.clientY - rect.top) * scaleY);
+
+            if (currentMode === 'ball') {
+                trajectory.push({ frame: currentFrame, x, y });
+                document.getElementById('ball-count').textContent = trajectory.length;
+            } else if (currentMode === 'pitch') {
+                pitchingPoint = { frame: currentFrame, x, y };
+                document.getElementById('pitch-status').textContent = `Frame ${currentFrame}`;
+                document.getElementById('pitch-status').classList.remove('text-red-400');
+                document.getElementById('pitch-status').classList.add('text-green-400');
+            } else if (currentMode === 'impact') {
+                impactPoint = { frame: currentFrame, x, y };
+                document.getElementById('impact-status').textContent = `Frame ${currentFrame}`;
+                document.getElementById('impact-status').classList.remove('text-red-400');
+                document.getElementById('impact-status').classList.add('text-green-400');
+            } else if (currentMode === 'wicket') {
+                if (!wicketStart) {
+                    wicketStart = { x, y };
+                } else {
+                    wicketRect = [wicketStart.x, wicketStart.y, x, y];
+                    wicketStart = null;
+                    document.getElementById('wicket-status').textContent = 'Set';
+                    document.getElementById('wicket-status').classList.remove('text-red-400');
+                    document.getElementById('wicket-status').classList.add('text-green-400');
+                }
+            }
+
+            updateAnalyzeButton();
+            drawOverlay();
+        });
+
+        function drawOverlay() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw trajectory
+            trajectory.forEach((p, i) => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
+                ctx.fillStyle = '#fbbf24';
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+
+            // Draw pitching point
+            if (pitchingPoint) {
+                ctx.beginPath();
+                ctx.arc(pitchingPoint.x, pitchingPoint.y, 12, 0, Math.PI * 2);
+                ctx.fillStyle = '#22c55e';
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+            }
+
+            // Draw impact point
+            if (impactPoint) {
+                ctx.fillStyle = '#ef4444';
+                ctx.fillRect(impactPoint.x - 12, impactPoint.y - 12, 24, 24);
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(impactPoint.x - 12, impactPoint.y - 12, 24, 24);
+            }
+
+            // Draw wicket rect
+            if (wicketRect) {
+                ctx.strokeStyle = '#06b6d4';
+                ctx.lineWidth = 3;
+                ctx.setLineDash([5, 5]);
+                ctx.strokeRect(wicketRect[0], wicketRect[1], wicketRect[2] - wicketRect[0], wicketRect[3] - wicketRect[1]);
+                ctx.setLineDash([]);
+            }
+        }
+
+        function updateAnalyzeButton() {
+            const canAnalyze = trajectory.length >= 2 && pitchingPoint && impactPoint && wicketRect;
+            document.getElementById('analyze-btn').disabled = !canAnalyze;
+        }
+
+        function clearAll() {
+            trajectory = [];
+            pitchingPoint = null;
+            impactPoint = null;
+            wicketRect = null;
+            wicketStart = null;
+            document.getElementById('ball-count').textContent = '0';
+            document.getElementById('pitch-status').textContent = 'Not set';
+            document.getElementById('pitch-status').className = 'text-red-400';
+            document.getElementById('impact-status').textContent = 'Not set';
+            document.getElementById('impact-status').className = 'text-red-400';
+            document.getElementById('wicket-status').textContent = 'Not set';
+            document.getElementById('wicket-status').className = 'text-red-400';
+            updateAnalyzeButton();
+            drawOverlay();
+        }
+
+        async function analyzeDRS() {
+            showLoading('Analyzing LBW decision...');
+
+            try {
+                const response = await fetch(`${API_URL}/analyze`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        video_id: videoId,
+                        trajectory: trajectory,
+                        pitching_point: pitchingPoint,
+                        impact_point: impactPoint,
+                        wicket_rect: wicketRect
+                    })
+                });
+
+                const result = await response.json();
+
+                // Show results
+                document.getElementById('decision-text').textContent = result.decision;
+                document.getElementById('decision-text').className = result.decision === 'OUT' ? 'text-3xl font-bold mb-2 text-red-500' : 'text-3xl font-bold mb-2 text-green-500';
+                document.getElementById('reason-text').textContent = result.reason;
+                document.getElementById('result-pitching').textContent = result.pitching_status.toUpperCase();
+                document.getElementById('result-impact').textContent = result.impact_status.toUpperCase();
+                document.getElementById('result-wickets').textContent = result.wickets_status.toUpperCase();
+                document.getElementById('download-video').href = `${API_URL}${result.output_video}`;
+                document.getElementById('download-image').href = `${API_URL}${result.output_image}`;
+
+                document.getElementById('editor-section').classList.add('hidden');
+                document.getElementById('results-section').classList.remove('hidden');
+
+                hideLoading();
+            } catch (error) {
+                alert('Analysis failed: ' + error.message);
+                hideLoading();
+            }
+        }
+
+        function startOver() {
+            document.getElementById('results-section').classList.add('hidden');
+            document.getElementById('upload-section').classList.remove('hidden');
+            clearAll();
+            videoId = null;
+            videoInfo = null;
+        }
+
+        function showLoading(text) {
+            document.getElementById('loading-text').textContent = text;
+            document.getElementById('loading').classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
