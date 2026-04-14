@@ -88,13 +88,21 @@ python drs_international.py
 
 ```
 LBW_DRS_Project/
-├── interactive_tracker.py    # Interactive ball tracking tool
+├── interactive_tracker.py    # Interactive ball tracking tool (Desktop)
 ├── drs_international.py      # DRS visualization generator
 ├── requirements.txt          # Python dependencies
 ├── trajectory_data.json      # Saved trajectory data (auto-generated)
 ├── output/                   # Generated outputs
 │   ├── drs_output.mp4       # Output video
 │   └── drs_output_final.png # Final frame
+├── web_app/                  # Web application
+│   ├── backend/             # FastAPI backend
+│   │   ├── main.py          # API server
+│   │   └── requirements.txt # Backend dependencies
+│   ├── frontend/            # Browser UI
+│   │   └── index.html       # Single-page application
+│   └── README.md            # Web app documentation
+├── LICENSE                   # MIT License
 └── README.md
 ```
 
@@ -155,6 +163,47 @@ This project is open source and available under the [MIT License](LICENSE).
 
 - Inspired by the Hawk-Eye DRS system used in international cricket
 - Built for educational and demonstration purposes
+
+## Web Application
+
+A browser-based version is also available in the `web_app/` folder.
+
+### Quick Start
+
+```bash
+# Terminal 1: Start backend
+cd web_app/backend
+pip install -r requirements.txt
+python main.py
+# Backend runs at http://localhost:8000
+
+# Terminal 2: Start frontend
+cd web_app/frontend
+python -m http.server 3000
+# Frontend runs at http://localhost:3000
+```
+
+### Web App Features
+
+- **Drag & Drop Upload** - Upload cricket videos directly in browser
+- **Frame-by-Frame Navigation** - Slider and buttons for precise frame selection
+- **Interactive Marking** - Click to mark ball positions, pitching, impact, wickets
+- **Real-time Preview** - See marked points overlaid on video
+- **Download Results** - Get output video and final frame image
+
+### API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/upload` | POST | Upload video file |
+| `/video/{id}/info` | GET | Get video metadata |
+| `/video/{id}/frame/{num}` | GET | Get specific frame |
+| `/analyze` | POST | Process and generate DRS output |
+| `/output/{filename}` | GET | Download output files |
+
+See `web_app/README.md` for detailed web app documentation.
+
+---
 
 ## Author
 
