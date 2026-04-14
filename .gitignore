@@ -1,0 +1,38 @@
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution
+dist/
+build/
+*.egg-info/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Video files (too large for git)
+*.mp4
+*.avi
+*.mov
+*.webm
+
+# Keep sample output image
+!output/drs_output_final.png
+
+# Temporary files
+*.tmp
+*.log
